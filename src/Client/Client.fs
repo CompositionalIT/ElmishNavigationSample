@@ -11,15 +11,26 @@ open Thoth.Json
 
 open Shared
 
+// TODO: Record for each page
+
+type Page =
+    | PageOne
+    | PageTwo
+    | PageThree
+    | PageFour
+
 // The model holds data that you want to keep track of while the application is running
 // in this case, we are keeping track of a counter
 // we mark it as optional, because initially it will not be available from the client
 // the initial value will be requested from server
-type Model = { Counter: Counter option }
+type Model = 
+    { Counter: Counter option
+      CurrentPage: Page }
 
 // The Msg type defines what events/actions can occur while the application is running
 // the state of the application changes *only* in reaction to these events
 type Msg =
+    | NavigateTo of Page
     | Increment
     | Decrement
     | InitialCountLoaded of Counter
@@ -28,7 +39,7 @@ let initialCounter () = Fetch.fetchAs<Counter> "/api/init"
 
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =
-    let initialModel = { Counter = None }
+    let initialModel = { Counter = None; CurrentPage = PageOne }
     let loadCountCmd =
         Cmd.OfPromise.perform initialCounter () InitialCountLoaded
     initialModel, loadCountCmd
@@ -37,15 +48,13 @@ let init () : Model * Cmd<Msg> =
 // It can also run side-effects (encoded as commands) like calling the server via Http.
 // these commands in turn, can dispatch messages to which the update function will react.
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
-    match currentModel.Counter, msg with
-    | Some counter, Increment ->
-        let nextModel = { currentModel with Counter = Some { Value = counter.Value + 1 } }
+    match currentModel, msg with
+    | model, InitialCountLoaded initialCount->
+        let nextModel = { model with Counter = Some initialCount }
         nextModel, Cmd.none
-    | Some counter, Decrement ->
-        let nextModel = { currentModel with Counter = Some { Value = counter.Value - 1 } }
-        nextModel, Cmd.none
-    | _, InitialCountLoaded initialCount->
-        let nextModel = { Counter = Some initialCount }
+    | model, NavigateTo page -> 
+        let nextModel = { model with CurrentPage = page }
+
         nextModel, Cmd.none
     | _ -> currentModel, Cmd.none
 
@@ -88,19 +97,17 @@ let view (model : Model) (dispatch : Msg -> unit) =
     div []
         [ Navbar.navbar [ Navbar.Color IsPrimary ]
             [ Navbar.Item.div [ ]
-                [ Heading.h2 [ ]
-                    [ str "SAFE Template" ] ] ]
+                [ Heading.h1 [ ]
+                    [ str "ALLYJAN" ] ] ]
 
           Container.container []
               [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ Heading.h3 [] [ str ("Press buttons to manipulate counter: " + show model) ] ]
+                    [ Heading.h3 [ ] [ str (sprintf "You are in %A" model.CurrentPage) ] ]
                 Columns.columns []
-                    [ Column.column [] [ button "-" (fun _ -> dispatch Decrement) ]
-                      Column.column [] [ button "+" (fun _ -> dispatch Increment) ] ] ]
-
-          Footer.footer [ ]
-                [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ safeComponents ] ] ]
+                    [ Column.column [] [ button "PAGE 1" (fun _ -> dispatch (NavigateTo PageOne) ) ]
+                      Column.column [] [ button "PAGE 2" (fun _ -> dispatch (NavigateTo PageTwo) ) ]
+                      Column.column [] [ button "PAGE 3" (fun _ -> dispatch (NavigateTo PageThree) ) ]
+                      Column.column [] [ button "PAGE 4" (fun _ -> dispatch (NavigateTo PageFour) ) ] ] ] ]                       
 
 #if DEBUG
 open Elmish.Debug
