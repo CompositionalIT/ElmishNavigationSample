@@ -2,146 +2,154 @@ module Client
 
 open Elmish
 open Elmish.React
-open Fable.Core
-open Fable
-open Elmish
 open Fable.React
 open Fable.React.Props
-open Fetch.Types
-open Thoth.Fetch
 open Fulma
-open Thoth.Json
 open Elmish.Navigation
-open Elmish.Cmd.OfPromise
-
+open System
 open Shared
 
-// TODO: Record for each page
+module HomePage = 
+    type Model = { Title : string }
 
-type Page =
-    | PageOne
-    | PageTwo
-    | PageThree
-    | PageFour
+    let init () = { Title = "Welcome! You're in HOME PAGE. " }
+    
+    let view (model: Model) dispatch =
+        Content.content [
+            Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
+        ] [ 
+            Heading.h3 [ ] [ str model.Title ]
+        ] 
 
-type PageOneModel = { Text : string }
+module PageOne =
+    type Model = 
+        { BuildingNo : int
+          Street : string
+          City : string 
+          Postcode : string }
 
-type PageTwoModel = { Text : string }
+    let init () =
+      { BuildingNo = 41
+        City = "London"
+        Postcode = "P21 1XX"
+        Street = "Liverpool St" }
 
-type PageThreeModel = { Text : string }
+    let view model dispatch =
+        Content.content [
+            Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
+        ] [ 
+            Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Address Page" ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Building No: %d" model.BuildingNo) ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Street: %s" model.Street) ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "City: %s" model.City) ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Postcode: %s" model.Postcode) ]
+        ]
 
-type PageFourModel = { Text : string }
+module PageTwo =
+    type Model =
+        { FirstName : string
+          Surname : string
+          BirthDate : DateTime }
+
+    let init () =
+        { FirstName = "Alican"
+          Surname = "Demirtas"
+          BirthDate = DateTime(1998,07,27) }
+
+    let view model dispatch =
+        Content.content [
+            Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
+        ] [ 
+            Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Person Page" ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "First Name: %s" model.FirstName) ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Surname: %s" model.Surname) ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Birth date: %s" (model.BirthDate.ToShortDateString())) ]
+        ]       
+
+type Page = HomePage | PageOne | PageTwo
 
 type SubModel =
-    | PageOneModel of PageOneModel
-    | PageTwoModel of PageTwoModel
+    | HomePageModel of HomePage.Model
+    | PageOneModel of PageOne.Model
+    | PageTwoModel of PageTwo.Model
 
-// The model holds data that you want to keep track of while the application is running
-// in this case, we are keeping track of a counter
-// we mark it as optional, because initially it will not be available from the client
-// the initial value will be requested from server
 type Model = 
-    { Counter: Counter option
-      CurrentPage: Page
+    { CurrentPage: Page
       SubModel: SubModel }
 
-// The Msg type defines what events/actions can occur while the application is running
-// the state of the application changes *only* in reaction to these events
 type Msg =
-    | NavigateTo of Page
-    | Increment
-    | Decrement
-    | InitialCountLoaded of Counter
+    | NoOp
 
-let initialCounter () = Fetch.fetchAs<Counter> "/api/init"
+let init page : Model * Cmd<Msg> =
+    let page = page |> Option.defaultValue HomePage
 
-// defines the initial state and initial command (= side-effect) of the application
-let init () : Model * Cmd<Msg> =
-    let initialModel = { Counter = None; CurrentPage = PageOne; SubModel = PageOneModel { Text = "You are currently in page 1!" } }
-    let loadCountCmd =
-        Cmd.OfPromise.perform initialCounter () InitialCountLoaded
-    initialModel, loadCountCmd
+    let subModel =
+        match page with
+        | HomePage -> HomePageModel (HomePage.init())
+        | PageOne -> PageOneModel (PageOne.init())
+        | PageTwo -> PageTwoModel (PageTwo.init())
 
-// The update functison computes the next state of the application based on the current state and the incoming events/messages
-// It can also run side-effects (encoded as commands) like calling the server via Http.
-// these commands in turn, can dispatch messages to which the update function will react.
-let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
-    match currentModel, msg with
-    | model, InitialCountLoaded initialCount->
-        let nextModel = { model with Counter = Some initialCount }
-        nextModel, Cmd.none
-    | model, NavigateTo page -> 
-        let nextModel = { model with CurrentPage = page }
-        nextModel, Cmd.none
-    | _ -> currentModel, Cmd.none
+    { CurrentPage = page
+      SubModel = subModel }, Cmd.none
+
+let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
+    match msg with NoOp -> model, Cmd.none
+
+let button txt href colour =
+    Button.a
+        [ Button.IsFullWidth
+          Button.Color colour
+          Button.Props [ Href href ] ]
+        [ str txt ]
+
+let view (model : Model) (dispatch : Msg -> unit) =
+    let getButtonColor page model =
+        if model.CurrentPage = page then
+            IsSuccess
+        else IsPrimary
+
+    div [] [ 
+        Navbar.navbar [ Navbar.Color IsPrimary ] [ 
+            Navbar.Item.div [ ] [ 
+                Heading.h1 [ ] [ str "Elmish navigation example" ] 
+            ] 
+        ]
+
+        Container.container [] [
+            Columns.columns [ Columns.Option.Props [ Style  [ Margin "3em" ] ] ] [ 
+                Column.column [] [ button "HOME PAGE" "#homepage" (model |> getButtonColor HomePage) ]
+                Column.column [] [ button "PAGE ONE" "#pageone" (model |> getButtonColor PageOne) ]
+                Column.column [] [ button "PAGE TWO" "#pagetwo" (model |> getButtonColor PageTwo) ]
+            ]
+            Columns.columns [] [ 
+                Column.column [] [ 
+                    match model.SubModel with
+                    | HomePageModel m -> HomePage.view m dispatch 
+                    | PageOneModel m -> PageOne.view m dispatch
+                    | PageTwoModel m -> PageTwo.view m dispatch
+                ]
+            ]
+        ] 
+    ]                       
 
 module Navigation = 
     open Elmish.UrlParser
 
-    let pageParser  =
+    let pageParser : Parser<_,_> =
         oneOf [
+            map HomePage (s "homepage")
             map PageOne (s "pageone")
-            map PageTwo (s "pagetwo")
-            map PageTwo (s "pagethree")
-            map PageTwo (s "pagefour") ]
+            map PageTwo (s "pagetwo") 
+        ]
 
-    let urlUpdate (result: Page option) model =
-        match result with
-        | Some page ->
-            { model with CurrentPage = page }, Cmd.none
-        | None ->
-            failwith ("Error passing url")
+    let urlUpdate (page: Page option) _ =
+        let page = page |> Option.defaultValue HomePage
+        
+        let model, _ = Some page |> init
 
-
-let safeComponents =
-    let components =
-        span [ ]
-           [ a [ Href "https://github.com/SAFE-Stack/SAFE-template" ]
-               [ str "SAFE  "
-                 str Version.template ]
-             str ", "
-             a [ Href "https://saturnframework.github.io" ] [ str "Saturn" ]
-             str ", "
-             a [ Href "http://fable.io" ] [ str "Fable" ]
-             str ", "
-             a [ Href "https://elmish.github.io" ] [ str "Elmish" ]
-             str ", "
-             a [ Href "https://fulma.github.io/Fulma" ] [ str "Fulma" ]
-
-           ]
-
-    span [ ]
-        [ str "Version "
-          strong [ ] [ str Version.app ]
-          str " powered by: "
-          components ]
-
-let show = function
-    | { Counter = Some counter } -> string counter.Value
-    | { Counter = None   } -> "Loading..."
-
-let button txt onClick colour =
-    Button.button
-        [ Button.IsFullWidth
-          Button.Color colour
-          Button.OnClick onClick ]
-        [ str txt ]
-
-let view (model : Model) (dispatch : Msg -> unit) =
-    div []
-        [ Navbar.navbar [ Navbar.Color IsPrimary ]
-            [ Navbar.Item.div [ ]
-                [ Heading.h1 [ ]
-                    [ str "ALLYJAN" ] ] ]
-
-          Container.container []
-              [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ Heading.h3 [ ] [ str (sprintf "You are in %A" model.CurrentPage) ] ]
-                Columns.columns []
-                    [ Column.column [] [ button "PAGE 1" (fun _ -> dispatch (NavigateTo PageOne) ) IsSuccess ]
-                      Column.column [] [ button "PAGE 2" (fun _ -> dispatch (NavigateTo PageTwo) ) IsPrimary ]
-                      Column.column [] [ button "PAGE 3" (fun _ -> dispatch (NavigateTo PageThree) ) IsPrimary ]
-                      Column.column [] [ button "PAGE 4" (fun _ -> dispatch (NavigateTo PageFour) ) IsPrimary ] ] ] ]                       
+        { model with 
+            CurrentPage = page; 
+            SubModel = model.SubModel }, Cmd.none
 
 #if DEBUG
 open Elmish.Debug
