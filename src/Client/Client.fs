@@ -1,45 +1,81 @@
 module Client
 
+open Fulma
 open Elmish
 open Elmish.React
 open Fable.React
 open Fable.React.Props
-open Fulma
+open Fable.FontAwesome
+open Fable.Core.JsInterop
+open Fable.Core
 open Elmish.Navigation
+open Browser
+open Browser.Types
 open System
 open Shared
 
-let button txt href colour =
+let button txt href options =
     Button.a
-        [ Button.IsFullWidth
-          Button.Color colour
-          Button.Props [ Href href ] ]
+        [ Button.Color IsPrimary
+          Button.Props [ Href href ]
+          yield! options ]
         [ str txt ]
 
-module HomePage = 
-    type Model = { FirstName : string option }
-
-    let init () = { FirstName = None }
+type Msg = PersonNameChanged of string
     
+module PersonPage =
+    type Model =
+        { Name : string }
+
+    let init fullName =
+        { Name = fullName }
+
+    let view model dispatch =
+        Content.content [
+            Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
+        ] [ 
+            Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Person Details" ]
+            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Full Name: %s" model.Name) ]
+        ]       
+
+let onKeyDown keyCode action =
+    OnKeyDown (fun ev ->
+        if ev.keyCode = keyCode then
+            ev.preventDefault()
+            action ev )
+
+module HomePage = 
+    type Model = { Name : string }
+
+    let init () = { Name = "" }
+
     let view (model: Model) dispatch =
         div [] [
             Content.content [
                 Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
             ] [ 
-                Heading.h1 [ ] [ str "Welcome! You're in the Home Page. " ]
-                br []; br []
-                Content.content [ ] [
-                    Heading.h3 [ ] [ str "Get person details by first name." ]
-                    Label.label [ ] [ str "First Name:"]
-                    Control.div [ ] [
-                        Input.text [Input.Placeholder "Enter Here..." ]
-                    ]
-                    Control.div [ ] [
-                        button "Submit" "#person/" IsPrimary
+                Heading.h1 [] [ str "Welcome! You're in the Home Page." ]
+                Content.content [] [
+                    Heading.h3 [] [ str "Enter Name to Navigate to Person Page" ]
+                    Label.label [] [ str "Name" ]
+                    Columns.columns [ Columns.IsCentered ] [
+                        Column.column [ Column.Width (Screen.All, Column.Is3) ] [
+                            Control.div [] [
+                                Input.text [
+                                    Input.Value model.Name
+                                    Input.Placeholder "Enter Name Here..."
+                                    Input.Props [ OnChange (fun ev -> dispatch (PersonNameChanged !!ev.target?value)) ]
+                                ]
+                            ]
+                            Control.div [ Control.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [
+                                let href = sprintf "#person/%s" model.Name
+                                button (sprintf "Set URL to '%s'" href) href [ ]
+                            ]
+                        ]
                     ]
                 ]
             ]
-        ]    
+        ]
 
 module AddressPage =
     type Model = 
@@ -58,42 +94,14 @@ module AddressPage =
         Content.content [
             Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
         ] [ 
-            Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Address" ]
+            Heading.h1 [ Heading.Props [ Style [ Margin "2rem" ] ] ] [ str "Address" ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Building No: %d" model.BuildingNo) ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Street: %s" model.Street) ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "City: %s" model.City) ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Postcode: %s" model.Postcode) ]
         ]
 
-module PersonPage =
-    type Model =
-        { FirstName : string
-          Surname : string
-          BirthDate : DateTime }
-
-    let alican =
-        { FirstName = "Alican"
-          Surname = "Demirtas"
-          BirthDate = DateTime(1998,07,27) }
-    let prash =
-        { FirstName = "Prashant"
-          Surname = "Pathak"
-          BirthDate = DateTime.UtcNow }            
-
-    let init () =
-        alican
-
-    let view model dispatch =
-        Content.content [
-            Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
-        ] [ 
-            Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Person Details" ]
-            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "First Name: %s" model.FirstName) ]
-            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Surname: %s" model.Surname) ]
-            Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Birth date: %s" (model.BirthDate.ToShortDateString())) ]
-        ]       
-
-type Page = HomePage | AddressPage | PersonPage
+type Page = HomePage | AddressPage | PersonPage of string
 
 type SubModel =
     | HomePageModel of HomePage.Model
@@ -104,9 +112,6 @@ type Model =
     { CurrentPage: Page
       SubModel: SubModel }
 
-type Msg =
-    | NoOp
-
 let init page : Model * Cmd<Msg> =
     let page = page |> Option.defaultValue HomePage
 
@@ -114,19 +119,21 @@ let init page : Model * Cmd<Msg> =
         match page with
         | HomePage -> HomePageModel (HomePage.init())
         | AddressPage -> AddressPageModel (AddressPage.init())
-        | PersonPage -> PersonPageModel (PersonPage.init())
+        | PersonPage name -> PersonPageModel (name |> PersonPage.init)
 
     { CurrentPage = page
       SubModel = subModel }, Cmd.none
 
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
-    match msg with NoOp -> model, Cmd.none
+    match msg with
+    | PersonNameChanged name -> { model with SubModel = HomePageModel { Name = name } }, Cmd.none
 
 let view (model : Model) (dispatch : Msg -> unit) =
-    let getButtonColor page model =
-        if model.CurrentPage = page then
-            IsSuccess
-        else IsPrimary
+    let navigationButton text href page model =
+        button text href [
+            Button.IsFullWidth
+            if model.CurrentPage = page then Button.Color IsSuccess
+        ]
 
     div [] [ 
         Navbar.navbar [ Navbar.Color IsPrimary ] [ 
@@ -137,9 +144,8 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
         Container.container [] [
             Columns.columns [ Columns.Option.Props [ Style  [ Margin "3em" ] ] ] [ 
-                Column.column [] [ button "HOME PAGE" "#home" (model |> getButtonColor HomePage) ]
-                Column.column [] [ button "ADDRESS PAGE" "#address" (model |> getButtonColor AddressPage) ]
-                // Column.column [] [ button "PERSON PAGE" "#person" (model |> getButtonColor PersonPage) ]
+                Column.column [] [ navigationButton "HOME PAGE" "#home" HomePage model ]
+                Column.column [] [ navigationButton "ADDRESS PAGE" "#address" AddressPage model ]
             ]
             Columns.columns [] [ 
                 Column.column [] [ 
@@ -159,7 +165,7 @@ module Navigation =
         oneOf [
             map HomePage (s "home")
             map AddressPage (s "address")
-            map PersonPage (s "person") 
+            map PersonPage (s "person" </> str)
         ]
 
     let urlUpdate (page: Page option) _ =
