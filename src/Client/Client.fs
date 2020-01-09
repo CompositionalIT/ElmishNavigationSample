@@ -5,30 +5,27 @@ open Elmish
 open Elmish.React
 open Fable.React
 open Fable.React.Props
-open Fable.FontAwesome
 open Fable.Core.JsInterop
-open Fable.Core
 open Elmish.Navigation
-open Browser
-open Browser.Types
-open System
-open Shared
 
-let button txt href options =
-    Button.a
-        [ Button.Color IsPrimary
-          Button.Props [ Href href ]
-          yield! options ]
-        [ str txt ]
+module HomePage = 
+    type Model = { Title : string }
 
-type Msg = PersonNameChanged of string
-    
+    let init () = { Title = "Welcome! You're in the Home Page." }
+
+    let view (model: Model) dispatch =
+        div [] [
+            Content.content [
+                Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
+            ] [ 
+                Heading.h1 [] [ str model.Title ]
+            ]
+        ]
+
 module PersonPage =
-    type Model =
-        { Name : string }
+    type Model = { Name : string }
 
-    let init fullName =
-        { Name = fullName }
+    let init fullName = { Name = fullName }
 
     let view model dispatch =
         Content.content [
@@ -36,45 +33,6 @@ module PersonPage =
         ] [ 
             Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Person Details" ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Full Name: %s" model.Name) ]
-        ]       
-
-let onKeyDown keyCode action =
-    OnKeyDown (fun ev ->
-        if ev.keyCode = keyCode then
-            ev.preventDefault()
-            action ev )
-
-module HomePage = 
-    type Model = { Name : string }
-
-    let init () = { Name = "" }
-
-    let view (model: Model) dispatch =
-        div [] [
-            Content.content [
-                Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
-            ] [ 
-                Heading.h1 [] [ str "Welcome! You're in the Home Page." ]
-                Content.content [] [
-                    Heading.h3 [] [ str "Enter Name to Navigate to Person Page" ]
-                    Label.label [] [ str "Name" ]
-                    Columns.columns [ Columns.IsCentered ] [
-                        Column.column [ Column.Width (Screen.All, Column.Is3) ] [
-                            Control.div [] [
-                                Input.text [
-                                    Input.Value model.Name
-                                    Input.Placeholder "Enter Name Here..."
-                                    Input.Props [ OnChange (fun ev -> dispatch (PersonNameChanged !!ev.target?value)) ]
-                                ]
-                            ]
-                            Control.div [ Control.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [
-                                let href = sprintf "#person/%s" model.Name
-                                button (sprintf "Set URL to '%s'" href) href [ ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
         ]
 
 module AddressPage =
@@ -101,7 +59,10 @@ module AddressPage =
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Postcode: %s" model.Postcode) ]
         ]
 
-type Page = HomePage | AddressPage | PersonPage of string
+type Page = 
+    | HomePage 
+    | AddressPage 
+    | PersonPage of string
 
 type SubModel =
     | HomePageModel of HomePage.Model
@@ -109,8 +70,11 @@ type SubModel =
     | PersonPageModel of PersonPage.Model
 
 type Model = 
-    { CurrentPage: Page
+    { NameEntry: string
+      CurrentPage: Page
       SubModel: SubModel }
+
+type Msg = PersonNameChanged of string
 
 let init page : Model * Cmd<Msg> =
     let page = page |> Option.defaultValue HomePage
@@ -122,12 +86,20 @@ let init page : Model * Cmd<Msg> =
         | PersonPage name -> PersonPageModel (name |> PersonPage.init)
 
     { CurrentPage = page
-      SubModel = subModel }, Cmd.none
+      SubModel = subModel
+      NameEntry = "" }, Cmd.none
 
 let update (msg : Msg) (model : Model) : Model * Cmd<Msg> =
     match msg with
-    | PersonNameChanged name -> { model with SubModel = HomePageModel { Name = name } }, Cmd.none
+    | PersonNameChanged name -> { model with NameEntry = name }, Cmd.none
 
+let button txt href options =
+    Button.a
+        [ Button.Color IsPrimary
+          Button.Props [ Href href ]
+          yield! options ]
+        [ str txt ]
+    
 let view (model : Model) (dispatch : Msg -> unit) =
     let navigationButton text href page model =
         button text href [
@@ -142,7 +114,28 @@ let view (model : Model) (dispatch : Msg -> unit) =
             ] 
         ]
 
-        Container.container [] [
+        Content.content [] [
+            Columns.columns [ Columns.IsCentered ] [
+                Column.column [ Column.Width (Screen.All, Column.Is3) ] [
+                    Control.div [ Control.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [
+                        br []
+                        Label.label [] [ str "Name" ]
+                        Input.text [
+                            Input.Value model.NameEntry
+                            Input.Placeholder "Enter Name Here..."
+                            Input.Props [ OnChange (fun ev -> dispatch (PersonNameChanged !!ev.target?value)) ]
+                        ]
+                    ]
+                    Control.div [ Control.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [
+                        br []
+                        let href = sprintf "#person/%s" model.NameEntry
+                        button (sprintf "Set URL to '%s'" href) href [ ]
+                    ]
+                ]
+            ]
+        ]
+
+        Container.container [ ] [
             Columns.columns [ Columns.Option.Props [ Style  [ Margin "3em" ] ] ] [ 
                 Column.column [] [ navigationButton "HOME PAGE" "#home" HomePage model ]
                 Column.column [] [ navigationButton "ADDRESS PAGE" "#address" AddressPage model ]
