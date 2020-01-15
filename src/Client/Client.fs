@@ -8,7 +8,7 @@ open Fable.React.Props
 open Fable.Core.JsInterop
 open Elmish.Navigation
 
-module HomePage = 
+module HomePage =
     type Model = { Title : string }
 
     let init () = { Title = "Welcome! You're in the Home Page." }
@@ -17,7 +17,7 @@ module HomePage =
         div [] [
             Content.content [
                 Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
-            ] [ 
+            ] [
                 Heading.h1 [] [ str model.Title ]
             ]
         ]
@@ -30,16 +30,16 @@ module PersonPage =
     let view model dispatch =
         Content.content [
             Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
-        ] [ 
+        ] [
             Heading.h1 [ Heading.Option.Props [ Style [ Margin "2rem" ] ] ] [ str "Person Details" ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Full Name: %s" model.Name) ]
         ]
 
 module AddressPage =
-    type Model = 
+    type Model =
         { BuildingNo : int
           Street : string
-          City : string 
+          City : string
           Postcode : string }
 
     let init () =
@@ -51,7 +51,7 @@ module AddressPage =
     let view model dispatch =
         Content.content [
             Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ]
-        ] [ 
+        ] [
             Heading.h1 [ Heading.Props [ Style [ Margin "2rem" ] ] ] [ str "Address" ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Building No: %d" model.BuildingNo) ]
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Street: %s" model.Street) ]
@@ -59,9 +59,9 @@ module AddressPage =
             Heading.h3 [ Heading.IsSubtitle ] [ str (sprintf "Postcode: %s" model.Postcode) ]
         ]
 
-type Page = 
-    | HomePage 
-    | AddressPage 
+type Page =
+    | HomePage
+    | AddressPage
     | PersonPage of string
 
 type SubModel =
@@ -69,7 +69,7 @@ type SubModel =
     | AddressPageModel of AddressPage.Model
     | PersonPageModel of PersonPage.Model
 
-type Model = 
+type Model =
     { NameEntry: string
       CurrentPage: Page
       SubModel: SubModel }
@@ -77,13 +77,14 @@ type Model =
 type Msg = PersonNameChanged of string
 
 let init page : Model * Cmd<Msg> =
+    printfn "IN INIT %A" page
     let page = page |> Option.defaultValue HomePage
 
     let subModel =
         match page with
         | HomePage -> HomePageModel (HomePage.init())
         | AddressPage -> AddressPageModel (AddressPage.init())
-        | PersonPage name -> PersonPageModel (name |> PersonPage.init)
+        | PersonPage name -> PersonPageModel (PersonPage.init name)
 
     { CurrentPage = page
       SubModel = subModel
@@ -99,7 +100,7 @@ let button txt href options =
           Button.Props [ Href href ]
           yield! options ]
         [ str txt ]
-    
+
 let view (model : Model) (dispatch : Msg -> unit) =
     let navigationButton text href page model =
         button text href [
@@ -107,11 +108,11 @@ let view (model : Model) (dispatch : Msg -> unit) =
             if model.CurrentPage = page then Button.Color IsSuccess
         ]
 
-    div [] [ 
-        Navbar.navbar [ Navbar.Color IsPrimary ] [ 
-            Navbar.Item.div [ ] [ 
-                Heading.h1 [ ] [ str "Elmish navigation example" ] 
-            ] 
+    div [] [
+        Navbar.navbar [ Navbar.Color IsPrimary ] [
+            Navbar.Item.div [ ] [
+                Heading.h1 [ ] [ str "Elmish navigation example" ]
+            ]
         ]
 
         Content.content [] [
@@ -136,38 +137,38 @@ let view (model : Model) (dispatch : Msg -> unit) =
         ]
 
         Container.container [ ] [
-            Columns.columns [ Columns.Option.Props [ Style  [ Margin "3em" ] ] ] [ 
+            Columns.columns [ Columns.Option.Props [ Style  [ Margin "3em" ] ] ] [
                 Column.column [] [ navigationButton "HOME PAGE" "#home" HomePage model ]
                 Column.column [] [ navigationButton "ADDRESS PAGE" "#address" AddressPage model ]
             ]
-            Columns.columns [] [ 
-                Column.column [] [ 
+            Columns.columns [] [
+                Column.column [] [
                     match model.SubModel with
-                    | HomePageModel m -> HomePage.view m dispatch 
+                    | HomePageModel m -> HomePage.view m dispatch
                     | AddressPageModel m -> AddressPage.view m dispatch
                     | PersonPageModel m -> PersonPage.view m dispatch
                 ]
             ]
-        ] 
-    ]                       
+        ]
+    ]
 
-module Navigation = 
+module Navigation =
     open Elmish.UrlParser
 
     let pageParser : Parser<_,_> =
         oneOf [
-            map HomePage (s "home")
-            map AddressPage (s "address")
-            map PersonPage (s "person" </> str)
+            s "home" |> map HomePage
+            s "address" |> map AddressPage
+            s "person" </> str |> map PersonPage
         ]
 
     let urlUpdate (page: Page option) _ =
         let page = page |> Option.defaultValue HomePage
-        
+
         let model, _ = Some page |> init
 
-        { model with 
-            CurrentPage = page; 
+        { model with
+            CurrentPage = page;
             SubModel = model.SubModel }, Cmd.none
 
 #if DEBUG
